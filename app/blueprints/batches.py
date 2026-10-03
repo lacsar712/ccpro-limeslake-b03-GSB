@@ -5,8 +5,13 @@ from flask_login import login_required
 
 from app.extensions import db
 from app.models import Pond, SlakeBatch
+from app.services.rules import RuleError, assert_can_register_batch, is_cooling_down
 
 bp = Blueprint("batches", __name__, url_prefix="/batches")
+
+
+def _cooling_pond_ids() -> set[int]:
+    return {p.id for p in Pond.query.all() if is_cooling_down(p)}
 
 
 @bp.route("/")
@@ -26,6 +31,25 @@ def create_batch():
     ponds = Pond.query.order_by(Pond.code).all()
     if request.method == "POST":
         pond_id = int(request.form["pond_id"])
+        pond = db.session.get(Pond, pond_id)
+        if pond is None:
+            flash("所选熟化池不存在", "error")
+            return render_template(
+                "batches/form.html",
+                ponds=ponds,
+                batch=None,
+                cooling_ids=_cooling_pond_ids(),
+            )
+        try:
+            assert_can_register_batch(pond)
+        except RuleError as exc:
+            flash(str(exc), "error")
+            return render_template(
+                "batches/form.html",
+                ponds=ponds,
+                batch=None,
+                cooling_ids=_cooling_pond_ids(),
+            )
         started_raw = request.form.get("started_at") or ""
         target = float(request.form.get("target_temp_c") or 80)
         peak_raw = (request.form.get("peak_temp_c") or "").strip()
@@ -46,15 +70,19 @@ def create_batch():
         db.session.add(batch)
         db.session.commit()
         flash("熟化批次已登记", "ok")
-        pond = db.session.get(Pond, pond_id)
         return redirect(
             url_for(
                 "board.floor_plan",
-                plant_id=pond.plant_id if pond else None,
+                plant_id=pond.plant_id,
                 pond=pond_id,
             )
         )
-    return render_template("batches/form.html", ponds=ponds, batch=None)
+    return render_template(
+        "batches/form.html",
+        ponds=ponds,
+        batch=None,
+        cooling_ids=_cooling_pond_ids(),
+    )
 
 
 @bp.route("/<int:batch_id>/edit", methods=["GET", "POST"])
@@ -80,4 +108,9 @@ def edit_batch(batch_id: int):
                 pond=batch.pond_id,
             )
         )
-    return render_template("batches/form.html", ponds=ponds, batch=batch)
+    return render_template(
+        "batches/form.html",
+        ponds=ponds,
+        batch=batch,
+        cooling_ids=_cooling_pond_ids(),
+    )

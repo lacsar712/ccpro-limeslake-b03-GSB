@@ -29,12 +29,13 @@ else:
 PY
 
 python << 'PY'
-from app import create_app, seed_demo_data
+from app import create_app, ensure_schema, seed_demo_data
 from app.extensions import db
 
 app = create_app()
 with app.app_context():
     db.create_all()
+    ensure_schema()
     seed_demo_data()
     print("migrate/seed done")
 PY

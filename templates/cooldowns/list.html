@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}出灰冷却钟{% endblock %}
+{% block content %}
+<section
+  class="cooldown-page"
+  data-controller="countdown"
+  data-countdown-server-now-value="{{ server_now_iso }}"
+>
+  <header class="page-head">
+    <div>
+      <h1>出灰冷却钟</h1>
+      <p>池位标记已出灰后默认冷却 4 小时；冷却未满禁止改回注水中、禁止登记新班。倒计时以服务器时刻为准。</p>
+    </div>
+  </header>
+
+  {% if groups %}
+    {% for group in groups %}
+    <section class="cooldown-plant panel">
+      <h2 class="cooldown-plant-name">{{ group.plant.name }} <span>{{ group.rows|length }} 个池位</span></h2>
+      <div class="cooldown-rows">
+        {% for row in group.rows %}
+        {% set pond = row.pond %}
+        <div
+          class="cooldown-row {% if row.cooling %}is-cooling{% else %}is-ready{% endif %}"
+          data-countdown-target="row"
+          data-until="{{ row.cooldown_until.isoformat() }}"
+          data-cooling="{{ 'true' if row.cooling else 'false' }}"
+        >
+          <div class="cd-main">
+            <span class="cd-code">{{ pond.code }}</span>
+            <span class="cd-plant-meta">{{ group.plant.location or '厂区位置未填' }}</span>
+          </div>
+          <div class="cd-time">
+            <span class="cd-remaining" data-countdown-target="remaining">
+              {% if row.cooling %}剩余 {{ row.remaining_minutes }} 分钟{% else %}冷却已满{% endif %}
+            </span>
+            <span
+              class="cd-until"
+              data-countdown-target="untilLocal"
+              data-until="{{ row.cooldown_until.isoformat() }}"
+            >至 {{ row.cooldown_until.strftime('%H:%M') }} UTC</span>
+          </div>
+          <form method="post" action="{{ url_for('cooldowns.refill_pond', pond_id=pond.id) }}">
+            <input type="hidden" name="from_status" value="drawn" />
+            <button
+              type="submit"
+              class="btn cd-btn"
+              data-countdown-target="button"
+              {% if row.cooling %}disabled{% endif %}
+            >{% if row.cooling %}冷却中…{% else %}改回注水中{% endif %}</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  {% else %}
+    <p class="empty-board">当前没有冷却中的池位。</p>
+  {% endif %}
+</section>
+{% endblock %}

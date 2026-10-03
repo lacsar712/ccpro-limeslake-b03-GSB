@@ -3,7 +3,7 @@ from flask_login import login_required
 
 from app.extensions import db
 from app.models import Plant, Pond
-from app.services.rules import RuleError, assert_can_set_pond_status
+from app.services.rules import RuleError, apply_pond_status
 
 bp = Blueprint("ponds", __name__, url_prefix="/ponds")
 
@@ -81,16 +81,25 @@ def edit_pond(pond_id: int):
             flash("同一厂区内池编号必须唯一", "error")
         else:
             try:
-                assert_can_set_pond_status(pond, status)
-                pond.plant_id = plant_id
-                pond.code = code
-                pond.status = status
-                pond.capacity_m3 = capacity
-                pond.notes = notes
+                locked = (
+                    db.session.query(Pond)
+                    .filter(Pond.id == pond.id)
+                    .with_for_update()
+                    .first()
+                )
+                from_status = (request.form.get("from_status") or "").strip()
+                if from_status and from_status != locked.status:
+                    raise RuleError(f"{pond.code} 状态已被他人更新，请刷新页面后重试")
+                apply_pond_status(locked, status)
+                locked.plant_id = plant_id
+                locked.code = code
+                locked.capacity_m3 = capacity
+                locked.notes = notes
                 db.session.commit()
                 flash("熟化池已更新", "ok")
                 return redirect(url_for("board.floor_plan", plant_id=plant_id, pond=pond.id))
             except RuleError as exc:
+                db.session.rollback()
                 flash(str(exc), "error")
     return render_template(
         "ponds/form.html",

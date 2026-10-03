@@ -90,6 +90,25 @@ body {
   color: #ecfccb;
 }
 
+.nav-cooldown {
+  position: relative;
+}
+
+.nav-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
 .ops-main {
   flex: 1;
   padding: 24px 28px 40px;
@@ -209,6 +228,16 @@ body {
 
 .tile-status { font-weight: 700; font-size: 0.95rem; }
 .tile-meta, .tile-cap { font-size: 0.85rem; opacity: 0.9; }
+
+.tile-cooldown {
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(185, 28, 28, 0.12);
+  color: var(--danger);
+  justify-self: start;
+}
 
 .empty-board {
   grid-column: 1 / -1;
@@ -347,6 +376,108 @@ button:hover, .btn:hover { background: #1e293b; }
 }
 
 .hint { color: var(--muted); font-size: 0.88rem; margin: 0; }
+
+/* 出灰冷却钟 */
+.cooldown-banner {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.cooldown-banner .cb-title {
+  font-weight: 800;
+  color: var(--danger);
+}
+
+.cooldown-banner .cb-clock {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #991b1b;
+  font-variant-numeric: tabular-nums;
+}
+
+.cooldown-banner .cb-note {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.cooldown-plant {
+  max-width: 860px;
+  margin-bottom: 18px;
+  gap: 12px;
+}
+
+.cooldown-plant-name {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--slate-deep);
+}
+
+.cooldown-plant-name span {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.cooldown-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.cooldown-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.cooldown-row.is-cooling {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.cooldown-row.is-ready {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.cd-main { display: grid; gap: 2px; }
+.cd-code { font-weight: 800; font-size: 1.05rem; }
+.cd-plant-meta { font-size: 0.82rem; color: var(--muted); }
+
+.cd-time { display: grid; gap: 2px; }
+.cd-remaining {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #991b1b;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-ready .cd-remaining { color: var(--ok); }
+.cd-until { font-size: 0.8rem; color: var(--muted); }
+
+.cd-btn {
+  padding: 9px 14px;
+  font-size: 0.9rem;
+}
+
+.cd-btn:disabled {
+  background: #cbd5e1;
+  color: #f8fafc;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .cooldown-row { grid-template-columns: 1fr; }
+}
 
 .flash-stack { margin-bottom: 16px; display: grid; gap: 8px; }
 .flash { padding: 10px 12px; border-radius: 8px; }

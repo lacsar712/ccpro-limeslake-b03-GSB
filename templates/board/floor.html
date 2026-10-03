@@ -3,8 +3,9 @@
 {% block content %}
 <section
   class="floor-page"
-  data-controller="board"
+  data-controller="board countdown"
   data-board-open-value="{{ 'true' if selected else 'false' }}"
+  data-countdown-server-now-value="{{ server_now_iso }}"
 >
   <header class="floor-head">
     <div>
@@ -45,6 +46,13 @@
     >
       <span class="tile-code">{{ pond.code }}</span>
       <span class="tile-status">{{ status_labels.get(pond.status, pond.status) }}</span>
+      {% if card.cooldown %}
+      <span
+        class="tile-cooldown"
+        data-countdown-target="clock"
+        data-until="{{ card.cooldown_until_iso }}"
+      >冷却 · 剩余 {{ card.remaining_minutes }} 分钟</span>
+      {% endif %}
       <span class="tile-meta">
         {% if batch and batch.peak_temp_c is not none %}
           峰值 {{ '%.0f'|format(batch.peak_temp_c) }}℃
@@ -101,6 +109,18 @@
         {% endif %}
       </section>
 
+      {% if selected_view and selected_view.cooldown %}
+      <div class="cooldown-banner">
+        <span class="cb-title">出灰冷却中</span>
+        <span
+          class="cb-clock"
+          data-countdown-target="clock"
+          data-until="{{ selected_view.cooldown_until_iso }}"
+        >剩余 {{ selected_view.remaining_minutes }} 分钟</span>
+        <span class="cb-note">冷却未满不能改回注水中，也不能登记新班；出灰登记不受影响。</span>
+      </div>
+      {% endif %}
+
       {% if selected_batch %}
       <form
         class="ops-form"
@@ -108,6 +128,7 @@
         action="{{ url_for('board.pond_ops', pond_id=selected.id) }}"
         data-controller="form-hint"
       >
+        <input type="hidden" name="from_status" value="{{ selected.status }}" />
         <label>登记 / 修正峰值温度 ℃
           <input
             name="peak_temp_c"
@@ -123,7 +144,16 @@
         <label>池状态
           <select name="status" data-form-hint-target="status">
             {% for key, label in status_labels.items() %}
-            <option value="{{ key }}" {% if selected.status == key %}selected{% endif %}>{{ label }}</option>
+            <option
+              value="{{ key }}"
+              {% if selected.status == key %}selected{% endif %}
+              {% if selected_view and selected_view.cooldown and key == 'filling' %}
+              disabled
+              data-countdown-target="refillOption"
+              data-until="{{ selected_view.cooldown_until_iso }}"
+              data-base-label="{{ label }}"
+              {% endif %}
+            >{{ label }}{% if selected_view and selected_view.cooldown and key == 'filling' %}（冷却剩余 {{ selected_view.remaining_minutes }} 分钟）{% endif %}</option>
             {% endfor %}
           </select>
         </label>

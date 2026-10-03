@@ -30,12 +30,33 @@ def create_app() -> Flask:
     from app.blueprints.auth import bp as auth_bp
     from app.blueprints.board import bp as board_bp
     from app.blueprints.batches import bp as batches_bp
+    from app.blueprints.cooldowns import bp as cooldowns_bp
     from app.blueprints.ponds import bp as ponds_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(board_bp)
     app.register_blueprint(ponds_bp)
     app.register_blueprint(batches_bp)
+    app.register_blueprint(cooldowns_bp)
+
+    @app.context_processor
+    def inject_cooldown_count():
+        from flask_login import current_user
+
+        from app.models import Pond
+        from app.services.rules import cooldown_remaining
+
+        count = 0
+        if current_user.is_authenticated:
+            try:
+                count = sum(
+                    1
+                    for p in Pond.query.all()
+                    if cooldown_remaining(p) is not None
+                )
+            except Exception:
+                count = 0
+        return {"cooldown_active_count": count}
 
     @app.route("/")
     def index():
@@ -47,6 +68,26 @@ def create_app() -> Flask:
         return redirect(url_for("auth.login"))
 
     return app
+
+
+def ensure_schema() -> None:
+    """db.create_all() 不会给既有表补列，这里幂等加列并回填存量已出灰池。"""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(db.engine)
+    pond_columns = {c["name"] for c in inspector.get_columns("ponds")}
+    if "drawn_at" not in pond_columns:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE ponds ADD COLUMN drawn_at TIMESTAMP WITH TIME ZONE")
+            )
+            # 存量已出灰池按「冷却早已走完」处理，不额外锁 4 小时
+            conn.execute(
+                text(
+                    "UPDATE ponds SET drawn_at = NOW() - INTERVAL '5 hours' "
+                    "WHERE status = 'drawn' AND drawn_at IS NULL"
+                )
+            )
 
 
 def seed_demo_data() -> None:
@@ -90,6 +131,8 @@ def seed_demo_data() -> None:
     db.session.flush()
 
     now = utcnow()
+    p3.drawn_at = now - timedelta(hours=1)
+    p6.drawn_at = now - timedelta(hours=10)
     db.session.add_all(
         [
             SlakeBatch(
