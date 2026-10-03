@@ -8,6 +8,7 @@
   </div>
 </header>
 <form class="panel" method="post" data-controller="form-hint">
+  {% if pond %}<input type="hidden" name="from_status" value="{{ pond.status }}" />{% endif %}
   <label>厂区
     <select name="plant_id" required>
       {% for plant in plants %}
@@ -21,10 +22,23 @@
   <label>状态
     <select name="status" data-form-hint-target="status">
       {% for key, label in status_labels.items() %}
-      <option value="{{ key }}" {% if pond and pond.status == key %}selected{% elif not pond and key == 'filling' %}selected{% endif %}>{{ label }}</option>
+      <option
+        value="{{ key }}"
+        {% if pond and pond.status == key %}selected{% elif not pond and key == 'filling' %}selected{% endif %}
+        {% if pond and key == 'filling' and pond.status == 'drawn' and cooldown_remaining_min > 0 %}disabled{% endif %}
+      >{{ label }}{% if pond and key == 'filling' and pond.status == 'drawn' and cooldown_remaining_min > 0 %}（冷却中禁选）{% endif %}</option>
       {% endfor %}
     </select>
   </label>
+  {% if pond and pond.status == 'drawn' %}
+  <p class="hint" id="cooldown-note">
+    {% if cooldown_remaining_min and cooldown_remaining_min > 0 %}
+    该池处于 {{ cooldown_hours }} 小时冷却期，剩余约 {{ cooldown_remaining_min }} 分钟，冷却未满不能改回注水中。
+    {% else %}
+    该池冷却已满，可改回注水中。
+    {% endif %}
+  </p>
+  {% endif %}
   <label>容量 m³
     <input name="capacity_m3" type="number" step="0.1" value="{{ pond.capacity_m3 if pond else 40 }}" />
   </label>

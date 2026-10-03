@@ -10,10 +10,18 @@
   <label>熟化池
     <select name="pond_id" required>
       {% for pond in ponds %}
-      <option value="{{ pond.id }}" {% if batch and batch.pond_id == pond.id %}selected{% endif %}>{{ pond.code }} · {{ pond.plant.name }}</option>
+      {% set mins = cooldown_minutes.get(pond.id, 0) if cooldown_minutes else 0 %}
+      <option
+        value="{{ pond.id }}"
+        {% if batch and batch.pond_id == pond.id %}selected{% endif %}
+        {% if not batch and mins > 0 %}disabled{% endif %}
+      >{{ pond.code }} · {{ pond.plant.name }}{% if not batch and mins > 0 %}（冷却中，剩 {{ mins }} 分钟，禁登新班）{% endif %}</option>
       {% endfor %}
     </select>
   </label>
+  {% if not batch %}
+  <p class="hint">已出灰池在 4 小时冷却期内禁止登记新班，冷却满后自动可选。</p>
+  {% endif %}
   <label>开始时间
     <input name="started_at" type="datetime-local"
       value="{% if batch %}{{ batch.started_at.strftime('%Y-%m-%dT%H:%M') }}{% endif %}" />

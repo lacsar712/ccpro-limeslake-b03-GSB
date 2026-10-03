@@ -5,3 +5,6 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+
+# 本地验证用依赖（容器内不需要）
+.pydeps/

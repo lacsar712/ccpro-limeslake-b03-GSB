@@ -3,7 +3,14 @@ from flask_login import login_required
 
 from app.extensions import db
 from app.models import Plant, Pond
-from app.services.rules import RuleError, assert_can_set_pond_status
+from app.services.rules import (
+    COOLDOWN_HOURS,
+    PondStateConflict,
+    RuleError,
+    locked_pond,
+    remaining_minutes,
+    transition_pond_status,
+)
 
 bp = Blueprint("ponds", __name__, url_prefix="/ponds")
 
@@ -72,6 +79,7 @@ def edit_pond(pond_id: int):
         status = request.form.get("status") or pond.status
         capacity = float(request.form.get("capacity_m3") or 0)
         notes = (request.form.get("notes") or "").strip()
+        from_status = (request.form.get("from_status") or "").strip() or None
         dup = Pond.query.filter(
             Pond.plant_id == plant_id,
             Pond.code == code,
@@ -81,20 +89,27 @@ def edit_pond(pond_id: int):
             flash("同一厂区内池编号必须唯一", "error")
         else:
             try:
-                assert_can_set_pond_status(pond, status)
-                pond.plant_id = plant_id
-                pond.code = code
-                pond.status = status
-                pond.capacity_m3 = capacity
-                pond.notes = notes
+                # 与抽屉同一条改池态链路：冷却约束、并发互斥在此一并生效
+                locked = locked_pond(pond_id)
+                transition_pond_status(locked, status, expected_status=from_status)
+                locked.plant_id = plant_id
+                locked.code = code
+                locked.capacity_m3 = capacity
+                locked.notes = notes
                 db.session.commit()
                 flash("熟化池已更新", "ok")
-                return redirect(url_for("board.floor_plan", plant_id=plant_id, pond=pond.id))
-            except RuleError as exc:
+                return redirect(
+                    url_for("board.floor_plan", plant_id=plant_id, pond=pond_id)
+                )
+            except (RuleError, PondStateConflict) as exc:
+                db.session.rollback()
                 flash(str(exc), "error")
+                pond = db.session.get(Pond, pond_id)
     return render_template(
         "ponds/form.html",
         pond=pond,
         plants=plants,
         status_labels=STATUS_LABELS,
+        cooldown_remaining_min=remaining_minutes(pond),
+        cooldown_hours=COOLDOWN_HOURS,
     )

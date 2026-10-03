@@ -54,6 +54,8 @@ class Pond(db.Model):
     status = db.Column(db.String(20), nullable=False, default=STATUS_FILLING)
     capacity_m3 = db.Column(db.Float, nullable=False, default=0.0)
     notes = db.Column(db.Text, nullable=False, default="")
+    # 最近一次转为「已出灰」的时刻；据此进入冷却钟，改回注水中前须冷却满
+    drawn_at = db.Column(db.DateTime(timezone=True), nullable=True)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     plant = db.relationship("Plant", back_populates="ponds")

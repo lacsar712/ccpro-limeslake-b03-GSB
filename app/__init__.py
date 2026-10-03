@@ -37,6 +37,18 @@ def create_app() -> Flask:
     app.register_blueprint(ponds_bp)
     app.register_blueprint(batches_bp)
 
+    @app.context_processor
+    def inject_cooldown_count():
+        # 顶栏冷却钟角标：当前冷却未满的池位数
+        from app.models import Pond
+        from app.services.rules import remaining_minutes
+
+        try:
+            count = sum(1 for p in Pond.query.all() if remaining_minutes(p) > 0)
+        except Exception:
+            count = 0
+        return {"cooling_count": count}
+
     @app.route("/")
     def index():
         from flask import redirect, url_for
@@ -47,6 +59,20 @@ def create_app() -> Flask:
         return redirect(url_for("auth.login"))
 
     return app
+
+
+def ensure_schema() -> None:
+    """db.create_all() 不会给既有表加列；旧库补齐 ponds.drawn_at。"""
+    from sqlalchemy import inspect
+
+    inspector = inspect(db.engine)
+    if "ponds" in inspector.get_table_names():
+        columns = {c["name"] for c in inspector.get_columns("ponds")}
+        if "drawn_at" not in columns:
+            db.session.execute(
+                db.text("ALTER TABLE ponds ADD COLUMN drawn_at TIMESTAMP WITH TIME ZONE")
+            )
+            db.session.commit()
 
 
 def seed_demo_data() -> None:
@@ -73,7 +99,16 @@ def seed_demo_data() -> None:
         worker.role = "worker"
 
     if Plant.query.first():
-        db.session.commit()
+        # 旧数据兼容：已出灰但没有出灰时刻的池，补打点并进入冷却
+        stale = (
+            Pond.query.filter_by(status=Pond.STATUS_DRAWN)
+            .filter(Pond.drawn_at.is_(None))
+            .all()
+        )
+        for pond in stale:
+            pond.drawn_at = utcnow()
+        if stale:
+            db.session.commit()
         return
 
     plant = Plant(name="东湾石灰厂", location="江北码头侧", notes="熟化池示范厂区")
@@ -82,10 +117,22 @@ def seed_demo_data() -> None:
 
     p1 = Pond(plant=plant, code="P-01", status=Pond.STATUS_SLAKING, capacity_m3=48.0)
     p2 = Pond(plant=plant, code="P-02", status=Pond.STATUS_FILLING, capacity_m3=36.0)
-    p3 = Pond(plant=plant, code="P-03", status=Pond.STATUS_DRAWN, capacity_m3=40.0)
+    p3 = Pond(
+        plant=plant,
+        code="P-03",
+        status=Pond.STATUS_DRAWN,
+        capacity_m3=40.0,
+        drawn_at=utcnow() - timedelta(hours=1),
+    )
     p4 = Pond(plant=plant, code="P-04", status=Pond.STATUS_SLAKING, capacity_m3=42.0)
     p5 = Pond(plant=plant, code="P-05", status=Pond.STATUS_FILLING, capacity_m3=38.0)
-    p6 = Pond(plant=plant, code="P-06", status=Pond.STATUS_DRAWN, capacity_m3=44.0)
+    p6 = Pond(
+        plant=plant,
+        code="P-06",
+        status=Pond.STATUS_DRAWN,
+        capacity_m3=44.0,
+        drawn_at=utcnow() - timedelta(hours=5),
+    )
     db.session.add_all([p1, p2, p3, p4, p5, p6])
     db.session.flush()
 

@@ -19,7 +19,11 @@
         </div>
       </div>
       <nav class="top-nav">
-        <a href="{{ url_for('board.floor_plan') }}" class="{% if request.blueprint == 'board' %}active{% endif %}">平面图</a>
+        <a href="{{ url_for('board.floor_plan') }}" class="{% if request.endpoint == 'board.floor_plan' %}active{% endif %}">平面图</a>
+        <a href="{{ url_for('board.cooldown_clock') }}" class="{% if request.endpoint == 'board.cooldown_clock' %}active{% endif %}">
+          冷却钟
+          {% if cooling_count %}<span class="nav-badge" aria-label="{{ cooling_count }} 个池位冷却中">{{ cooling_count }}</span>{% endif %}
+        </a>
         <a href="{{ url_for('auth.logout') }}">退出</a>
       </nav>
     </header>

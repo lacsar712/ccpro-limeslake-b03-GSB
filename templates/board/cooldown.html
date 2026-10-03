@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}冷却钟{% endblock %}
+{% block content %}
+<section
+  class="cooldown-page"
+  data-controller="countdown"
+  data-countdown-now-value="{{ '%.3f'|format(server_now_epoch) }}"
+  data-countdown-reload-value="true"
+>
+  <header class="page-head">
+    <div>
+      <h1>冷却钟</h1>
+      <p>
+        池位标记为「已出灰」后进入 {{ cooldown_hours }} 小时冷却：冷却未满禁止改回注水中、禁止登记新班。
+        倒计时以服务器时刻为准。
+      </p>
+    </div>
+    <p class="server-clock">
+      服务器时刻（UTC）
+      <span data-countdown-target="clock" data-countdown-now-value="{{ '%.3f'|format(server_now_epoch) }}">
+        {{ server_now.strftime('%Y-%m-%d %H:%M:%S') }}
+      </span>
+    </p>
+  </header>
+
+  {% if plant_rows %}
+    {% for row in plant_rows %}
+    <section class="panel cooldown-plant">
+      <header class="cooldown-plant-head">
+        <h2>{{ row.plant.name }}</h2>
+        <span class="cooldown-summary">
+          冷却中 {{ row.cooling|length }} · 已满待放行 {{ row.ready|length }}
+        </span>
+      </header>
+
+      {% if row.cooling %}
+      <ul class="cooldown-list" role="list">
+        {% for view in row.cooling %}
+        {% set pond = view.pond %}
+        <li class="cooldown-item cooling">
+          <div class="cooldown-item-main">
+            <span class="cooldown-code">{{ pond.code }}</span>
+            <span class="cooldown-state">{{ status_labels.get(pond.status, pond.status) }}</span>
+            <span class="cooldown-since">出灰于 {{ pond.drawn_at.strftime('%Y-%m-%d %H:%M') }}（服务器时间）</span>
+          </div>
+          <div class="cooldown-timer">
+            <span
+              class="cooldown-remain"
+              data-countdown-target="timer"
+              data-until="{{ '%.3f'|format(view.cooldown_until.timestamp()) }}"
+              data-done="冷却已满，可改回注水中"
+            >剩余 {{ view.cooldown_remaining_min }} 分钟</span>
+            <span class="cooldown-blocked">未满，禁止改回注水中 / 登记新班</span>
+          </div>
+          <a
+            class="btn ghost cooldown-goto"
+            href="{{ url_for('board.floor_plan', plant_id=row.plant.id, pond=pond.id) }}"
+          >打开抽屉</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if row.ready %}
+      <ul class="cooldown-list ready-list" role="list">
+        {% for view in row.ready %}
+        {% set pond = view.pond %}
+        <li class="cooldown-item ready">
+          <div class="cooldown-item-main">
+            <span class="cooldown-code">{{ pond.code }}</span>
+            <span class="cooldown-state">{{ status_labels.get(pond.status, pond.status) }}</span>
+          </div>
+          <div class="cooldown-timer">
+            <span class="cooldown-done">冷却已满，可改回注水中并登记新班</span>
+          </div>
+          <a
+            class="btn cooldown-goto"
+            href="{{ url_for('board.floor_plan', plant_id=row.plant.id, pond=pond.id) }}"
+          >去放行</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+    {% endfor %}
+  {% else %}
+    <p class="empty-board">当前没有处于冷却中的池位。</p>
+  {% endif %}
+</section>
+{% endblock %}
